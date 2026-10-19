@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Music2, Plus, Pencil, Trash2, Play, Search, Loader2, Sparkles, Import, ChevronDown, ChevronUp, CloudOff } from 'lucide-react'
+import { Music2, Plus, Pencil, Trash2, Play, Search, Loader2, Sparkles, Import, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, CloudOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,6 +32,8 @@ function formatDate(ts: number): string {
 
 type SearchState = 'idle' | 'searching' | 'done' | 'error'
 
+const PAGE_SIZE = 8
+
 function OnlineSearch() {
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
@@ -39,6 +41,7 @@ function OnlineSearch() {
   const [error, setError] = useState('')
   const [results, setResults] = useState<LrcTrack[]>([])
   const [expanded, setExpanded] = useState<number | null>(null)
+  const [page, setPage] = useState(0)
 
   const doSearch = async (e?: React.FormEvent) => {
     e?.preventDefault()
@@ -51,11 +54,17 @@ function OnlineSearch() {
       setResults(tracks.filter((t) => !t.instrumental && t.plainLyrics))
       setState('done')
       setExpanded(null)
+      setPage(0)
     } catch (err) {
       setError(err instanceof Error ? err.message : '网络异常，请稍后再试')
       setState('error')
     }
   }
+
+  const totalPages = Math.max(1, Math.ceil(results.length / PAGE_SIZE))
+  const pageItems = results.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE)
+  const rangeStart = results.length === 0 ? 0 : page * PAGE_SIZE + 1
+  const rangeEnd = Math.min(results.length, (page + 1) * PAGE_SIZE)
 
   const importTrack = (track: LrcTrack) => {
     const lines = splitLyrics(track.plainLyrics ?? '')
@@ -121,8 +130,10 @@ function OnlineSearch() {
               </p>
             ) : (
               <>
-                <p className="px-1 text-xs text-muted-foreground">找到 {results.length} 条结果，点「预览谐音」查看效果</p>
-                {results.slice(0, 8).map((track) => {
+                <p className="px-1 text-xs text-muted-foreground">
+                  共 {results.length} 条结果，第 {rangeStart}–{rangeEnd} 条，点「预览谐音」查看效果
+                </p>
+                {pageItems.map((track) => {
                   const open = expanded === track.id
                   const previewLines = open ? splitLyrics(track.plainLyrics ?? '').slice(0, 6) : []
                   return (
@@ -163,6 +174,27 @@ function OnlineSearch() {
                     </div>
                   )
                 })}
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-center gap-1.5 pt-3">
+                    <Button variant="outline" size="sm" className="h-8" disabled={page === 0} onClick={() => { setPage(page - 1); setExpanded(null) }}>
+                      <ChevronLeft className="h-3.5 w-3.5" /> 上一页
+                    </Button>
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <Button
+                        key={i}
+                        variant={i === page ? 'default' : 'ghost'}
+                        size="sm"
+                        className="h-8 w-8 px-0"
+                        onClick={() => { setPage(i); setExpanded(null) }}
+                      >
+                        {i + 1}
+                      </Button>
+                    ))}
+                    <Button variant="outline" size="sm" className="h-8" disabled={page >= totalPages - 1} onClick={() => { setPage(page + 1); setExpanded(null) }}>
+                      下一页 <ChevronRight className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                )}
               </>
             )}
           </div>
